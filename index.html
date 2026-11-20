@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DropVault</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          },
+          colors: {
+            brand: {
+              400: '#3ECF8E',
+              500: '#24B47E'
+            },
+            surface: {
+              950: '#0B0F14',
+              900: '#11161D',
+              800: '#1D2633',
+              700: '#2A3647'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      background-color: #0B0F14;
+      color: #F1F5F9;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .dropzone-active {
+      border-color: #3ECF8E !important;
+      background-color: rgba(62, 207, 142, 0.08) !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-brand-400/30 selection:text-brand-400">
+
+  <!-- ==================== MINIMAL LOGIN SCREEN ==================== -->
+  <main id="auth-view" class="flex-1 flex items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-surface-900 border border-surface-800 rounded-2xl p-6 shadow-xl">
+
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-brand-400/15 border border-brand-400/30 flex items-center justify-center text-brand-400">
+            <i data-lucide="cloud-upload" class="w-4 h-4"></i>
+          </div>
+          <h1 class="text-lg font-bold text-white tracking-tight">DropVault</h1>
+        </div>
+        <button id="btn-toggle-config" type="button" title="Supabase Project Keys"
+          class="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-brand-400 transition cursor-pointer">
+          <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+          <span id="config-status-badge">Keys</span>
+        </button>
+      </div>
+
+      <!-- Collapsible Supabase Credentials -->
+      <div id="config-panel" class="hidden bg-surface-950 border border-surface-800 rounded-xl p-3.5 mb-5 space-y-2.5">
+        <div>
+          <label for="input-sb-url" class="block text-[11px] text-slate-400 mb-1">Supabase URL</label>
+          <input id="input-sb-url" type="url" placeholder="https://xxxx.supabase.co"
+            class="w-full rounded-lg bg-surface-900 border border-surface-700 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-400" />
+        </div>
+        <div>
+          <label for="input-sb-key" class="block text-[11px] text-slate-400 mb-1">Anon Key</label>
+          <input id="input-sb-key" type="password" placeholder="eyJhbGciOi..."
+            class="w-full rounded-lg bg-surface-900 border border-surface-700 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-400" />
+        </div>
+        <div class="flex items-center justify-between pt-1">
+          <button id="open-setup-from-auth" type="button" class="text-[11px] text-slate-400 hover:text-brand-400 underline cursor-pointer">SQL Setup</button>
+          <button id="btn-save-config" type="button" class="text-xs font-semibold text-brand-400 hover:text-brand-500 cursor-pointer">Save</button>
+        </div>
+      </div>
+
+      <!-- Sign In / Sign Up Tabs -->
+      <div class="flex rounded-lg bg-surface-950 p-1 border border-surface-800 mb-4">
+        <button id="tab-signin" type="button" class="flex-1 py-1.5 text-xs font-semibold rounded-md bg-surface-800 text-white transition cursor-pointer">
+          Sign In
+        </button>
+        <button id="tab-signup" type="button" class="flex-1 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white transition cursor-pointer">
+          Sign Up
+        </button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="auth-form" class="space-y-3.5">
+        <div>
+          <label for="auth-email" class="block text-xs text-slate-400 mb-1">Email</label>
+          <input id="auth-email" type="email" required placeholder="you@example.com"
+            class="w-full rounded-lg bg-surface-950 border border-surface-700 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-400" />
+        </div>
+        <div>
+          <label for="auth-password" class="block text-xs text-slate-400 mb-1">Password</label>
+          <input id="auth-password" type="password" required minlength="6" placeholder="••••••••"
+            class="w-full rounded-lg bg-surface-950 border border-surface-700 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-400" />
+        </div>
+        <div id="auth-error-box" class="hidden rounded-lg bg-rose-500/10 border border-rose-500/30 px-3 py-2 text-xs text-rose-300"></div>
+        <button id="btn-auth-submit" type="submit"
+          class="w-full py-2.5 rounded-lg bg-brand-400 hover:bg-brand-500 text-surface-950 font-semibold text-sm transition cursor-pointer">
+          <span id="auth-submit-label">Sign In</span>
+        </button>
+      </form>
+
+      <div class="mt-4 pt-4 border-t border-surface-800 flex items-center justify-between gap-2">
+        <button id="btn-launch-demo" type="button"
+          class="text-xs font-medium text-slate-300 hover:text-white transition cursor-pointer">
+          Demo Login →
+        </button>
+        <button id="btn-open-setup-bottom" type="button"
+          class="text-xs text-slate-500 hover:text-brand-400 transition cursor-pointer">
+          Supabase SQL
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== VAULT APP (AFTER LOGIN) ==================== -->
+  <div id="app-view" class="hidden flex-1 flex flex-col">
+
+    <!-- Minimal Header -->
+    <header class="sticky top-0 z-30 bg-surface-900/90 backdrop-blur border-b border-surface-800">
+      <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-brand-400/15 border border-brand-400/30 flex items-center justify-center text-brand-400 shrink-0">
+            <i data-lucide="cloud-upload" class="w-4 h-4"></i>
+          </div>
+          <span class="font-bold text-white text-sm">DropVault</span>
+          <span id="mode-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">Demo</span>
+          <span id="header-user-email" class="hidden sm:inline text-xs text-slate-400 truncate"></span>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <button id="btn-sync" type="button" title="Sync"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 text-slate-200 text-xs font-medium transition cursor-pointer">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">Sync</span>
+          </button>
+          <button id="btn-open-setup" type="button" title="Supabase SQL"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 text-brand-400 text-xs font-medium transition cursor-pointer">
+            <i data-lucide="code-2" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">SQL</span>
+          </button>
+          <button id="btn-signout" type="button" title="Sign Out"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-800 hover:bg-rose-500/20 hover:text-rose-300 text-slate-300 text-xs font-medium transition cursor-pointer">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="max-w-5xl w-full mx-auto px-4 py-5 space-y-5 flex-1">
+
+      <!-- Composer -->
+      <section class="bg-surface-900 border border-surface-800 rounded-2xl p-4 space-y-3">
+        <div class="flex items-center justify-between gap-2">
+          <div class="inline-flex rounded-lg bg-surface-950 p-1 border border-surface-800">
+            <button data-composer-tab="link" type="button" class="composer-tab px-3 py-1.5 rounded-md text-xs font-semibold bg-surface-800 text-white transition flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="link" class="w-3.5 h-3.5"></i> Link
+            </button>
+            <button data-composer-tab="image" type="button" class="composer-tab px-3 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="image" class="w-3.5 h-3.5"></i> Image
+            </button>
+            <button data-composer-tab="video" type="button" class="composer-tab px-3 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="video" class="w-3.5 h-3.5"></i> Video
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400">
+            <span id="quota-text">0 B / 1 GB</span>
+            <div class="w-16 h-1.5 rounded-full bg-surface-950 overflow-hidden border border-surface-800">
+              <div id="quota-bar" class="h-full bg-brand-400 rounded-full" style="width: 1%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Link Form -->
+        <form id="form-link-drop" class="flex flex-col sm:flex-row gap-2">
+          <div class="relative flex-1">
+            <input id="drop-link-content" type="text" required placeholder="Paste link or text..."
+              class="w-full rounded-xl bg-surface-950 border border-surface-700 pl-3.5 pr-16 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-400" />
+            <button id="btn-paste-clipboard" type="button"
+              class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md bg-surface-800 hover:bg-surface-700 text-[11px] text-slate-300 cursor-pointer">
+              Paste
+            </button>
+          </div>
+          <input id="drop-link-title" type="text" placeholder="Label (optional)"
+            class="sm:w-44 rounded-xl bg-surface-950 border border-surface-700 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-400" />
+          <button id="btn-save-link" type="submit"
+            class="px-5 py-2.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-surface-950 font-semibold text-sm transition cursor-pointer shrink-0">
+            Save
+          </button>
+        </form>
+
+        <!-- Image Form -->
+        <form id="form-image-drop" class="hidden space-y-2.5">
+          <div id="image-dropzone" class="border-2 border-dashed border-surface-700 hover:border-brand-400/60 rounded-xl p-5 text-center bg-surface-950/60 transition cursor-pointer">
+            <input id="input-image-file" type="file" accept="image/*" class="hidden" />
+            <p id="image-file-label" class="text-xs font-medium text-slate-300">Click or drop an image (max 50 MB)</p>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input id="drop-image-title" type="text" placeholder="Title (optional)"
+              class="flex-1 rounded-xl bg-surface-950 border border-surface-700 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-400" />
+            <button id="btn-upload-image" type="submit"
+              class="px-5 py-2 rounded-xl bg-brand-400 hover:bg-brand-500 text-surface-950 font-semibold text-sm transition cursor-pointer">
+              Upload Image
+            </button>
+          </div>
+        </form>
+
+        <!-- Video Form -->
+        <form id="form-video-drop" class="hidden space-y-2.5">
+          <div id="video-dropzone" class="border-2 border-dashed border-surface-700 hover:border-brand-400/60 rounded-xl p-5 text-center bg-surface-950/60 transition cursor-pointer">
+            <input id="input-video-file" type="file" accept="video/*" class="hidden" />
+            <p id="video-file-label" class="text-xs font-medium text-slate-300">Click or drop a video (max 50 MB)</p>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input id="drop-video-title" type="text" placeholder="Title (optional)"
+              class="flex-1 rounded-xl bg-surface-950 border border-surface-700 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-400" />
+            <button id="btn-upload-video" type="submit"
+              class="px-5 py-2 rounded-xl bg-brand-400 hover:bg-brand-500 text-surface-950 font-semibold text-sm transition cursor-pointer">
+              Upload Video
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Filters & Search -->
+      <section class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button data-filter="all" type="button" class="filter-pill px-3 py-1 rounded-full text-xs font-semibold bg-brand-400 text-surface-950 transition cursor-pointer">
+            All (<span id="count-all">0</span>)
+          </button>
+          <button data-filter="link" type="button" class="filter-pill px-3 py-1 rounded-full text-xs font-semibold bg-surface-900 text-slate-300 border border-surface-800 hover:border-surface-700 transition cursor-pointer">
+            Links (<span id="count-link">0</span>)
+          </button>
+          <button data-filter="image" type="button" class="filter-pill px-3 py-1 rounded-full text-xs font-semibold bg-surface-900 text-slate-300 border border-surface-800 hover:border-surface-700 transition cursor-pointer">
+            Images (<span id="count-image">0</span>)
+          </button>
+          <button data-filter="video" type="button" class="filter-pill px-3 py-1 rounded-full text-xs font-semibold bg-surface-900 text-slate-300 border border-surface-800 hover:border-surface-700 transition cursor-pointer">
+            Videos (<span id="count-video">0</span>)
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <div class="relative flex-1 sm:w-56">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input id="search-input" type="search" placeholder="Search..."
+              class="w-full rounded-xl bg-surface-900 border border-surface-800 pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-400" />
+          </div>
+          <select id="sort-select" aria-label="Sort items"
+            class="rounded-xl bg-surface-900 border border-surface-800 px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-brand-400 cursor-pointer">
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="largest">Largest</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Stored Items Grid -->
+      <section id="drops-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5"></section>
+
+      <!-- Empty State -->
+      <section id="empty-state" class="hidden bg-surface-900/50 border border-dashed border-surface-800 rounded-2xl p-8 text-center">
+        <p class="text-xs text-slate-400">No items yet.</p>
+      </section>
+    </main>
+  </div>
+
+  <!-- ==================== DELETE CONFIRMATION MODAL ==================== -->
+  <div id="delete-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-surface-900 border border-rose-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl">
+      <h3 class="text-sm font-bold text-white mb-1">Confirm Delete</h3>
+      <p class="text-xs text-slate-400 mb-3">This permanently deletes the item and cannot be undone.</p>
+
+      <div class="bg-surface-950 border border-surface-800 rounded-xl p-3 mb-3">
+        <div class="text-[10px] uppercase tracking-wider text-slate-500" id="delete-modal-type">LINK</div>
+        <div class="text-xs font-semibold text-white break-all mt-0.5" id="delete-modal-title"></div>
+        <div class="text-[11px] text-slate-400 mt-0.5" id="delete-modal-meta"></div>
+      </div>
+
+      <label class="flex items-start gap-2 mb-4 cursor-pointer select-none">
+        <input id="delete-confirm-checkbox" type="checkbox" class="mt-0.5 rounded border-surface-700 bg-surface-950 text-rose-500 cursor-pointer" />
+        <span class="text-xs text-slate-300">Yes, permanently delete this item</span>
+      </label>
+
+      <div class="flex items-center justify-end gap-2">
+        <button id="btn-cancel-delete" type="button" class="px-3.5 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 text-slate-200 text-xs font-semibold cursor-pointer">
+          Cancel
+        </button>
+        <button id="btn-confirm-delete" type="button" disabled
+          class="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold cursor-pointer">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MEDIA PREVIEW MODAL ==================== -->
+  <div id="preview-modal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-surface-900 border border-surface-700 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+      <div class="px-4 py-3 border-b border-surface-800 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <h3 id="preview-modal-title" class="text-sm font-semibold text-white truncate"></h3>
+          <p id="preview-modal-meta" class="text-[11px] text-slate-400"></p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="btn-preview-download" type="button" class="px-3 py-1.5 rounded-lg bg-brand-400 hover:bg-brand-500 text-surface-950 text-xs font-semibold cursor-pointer">
+            Download
+          </button>
+          <button id="btn-close-preview" type="button" class="p-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 text-slate-300 cursor-pointer" aria-label="Close">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+      <div id="preview-modal-body" class="p-4 flex-1 overflow-auto flex items-center justify-center bg-surface-950 min-h-[260px]"></div>
+    </div>
+  </div>
+
+  <!-- ==================== SUPABASE SQL MODAL ==================== -->
+  <div id="setup-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-surface-900 border border-surface-700 rounded-2xl max-w-2xl w-full max-h-[88vh] flex flex-col overflow-hidden shadow-2xl">
+      <div class="px-4 py-3.5 border-b border-surface-800 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white">Supabase SQL Setup</h3>
+        <div class="flex items-center gap-2">
+          <button id="btn-copy-sql" type="button" class="px-3 py-1 rounded-lg bg-brand-400 hover:bg-brand-500 text-surface-950 font-semibold text-xs cursor-pointer">
+            Copy SQL
+          </button>
+          <button id="btn-close-setup" type="button" class="p-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 text-slate-300 cursor-pointer" aria-label="Close">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+      <div class="p-4 overflow-y-auto space-y-3 text-xs text-slate-300">
+        <p class="text-slate-400">Run this once in your Supabase SQL Editor, then paste your Project URL &amp; Anon Key under <strong class="text-white">Keys</strong> (or set <code class="text-brand-400">DEFAULT_SUPABASE_CONFIG</code> in this HTML file).</p>
+        <pre id="sql-code-block" class="bg-surface-950 border border-surface-800 rounded-xl p-3.5 overflow-x-auto font-mono text-[11px] leading-relaxed text-emerald-300"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST CONTAINER ==================== -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-xs pointer-events-none"></div>
+
+  <script>
+    // Put your Supabase URL & Anon Key here when hosting on GitHub Pages / Vercel / Netlify
+    const DEFAULT_SUPABASE_CONFIG = {
+      url: 'https://qimdvotclrtgceplcsyf.supabase.co',
+      anonKey: 'sb_publishable_T6CssVjIaEkWwlaFv4UF0Q_gAT5IOwL'
+    };
+
+    const FREE_TIER_STORAGE_LIMIT_BYTES = 1024 * 1024 * 1024; // 1 GB
+    const FREE_TIER_MAX_FILE_BYTES = 50 * 1024 * 1024;       // 50 MB
+    const STORAGE_KEY_CONFIG = 'dropvault_sb_config_v1';
+
+    const SUPABASE_SETUP_SQL = `-- 1. Table for links, images, and videos
+create table if not exists public.drops (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  type text not null check (type in ('link', 'image', 'video')),
+  title text not null,
+  content text,
+  storage_path text,
+  mime_type text,
+  file_size bigint not null default 0,
+  device_label text not null default 'Web',
+  created_at timestamptz not null default now()
+);
+
+-- 2. Row Level Security (only logged-in owner can read/write/delete)
+alter table public.drops enable row level security;
+
+create policy "Users can view own drops"
+  on public.drops for select using (auth.uid() = user_id);
+
+create policy "Users can insert own drops"
+  on public.drops for insert with check (auth.uid() = user_id);
+
+create policy "Users can delete own drops"
+  on public.drops for delete using (auth.uid() = user_id);
+
+-- 3. Private 'vault' storage bucket (50 MB max file size on Free tier)
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('vault', 'vault', false, 52428800)
+on conflict (id) do nothing;
+
+-- 4. Storage RLS policies scoped to user folder <user_id>/
+create policy "Users can upload to own vault folder"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'vault' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can view own vault files"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'vault' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can delete own vault files"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'vault' and (storage.foldername(name))[1] = auth.uid()::text);`;
+
+    const DEMO_SAMPLE_IMG = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+        <rect width="640" height="360" fill="#0F172A"/>
+        <circle cx="320" cy="160" r="56" fill="#064E3B" stroke="#3ECF8E" stroke-width="3"/>
+        <text x="320" y="167" fill="#3ECF8E" font-family="sans-serif" font-size="20" font-weight="700" text-anchor="middle">IMG</text>
+        <text x="320" y="255" fill="#94A3B8" font-family="sans-serif" font-size="14" text-anchor="middle">Sample stored image</text>
+      </svg>
+    `);
+
+    function createInitialDemoDrops() {
+      const now = Date.now();
+      return [
+        {
+          id: 'demo-1',
+          type: 'link',
+          title: 'Supabase Docs',
+          content: 'https://supabase.com/docs',
+          storage_path: null,
+          preview_url: null,
+          mime_type: 'text/uri-list',
+          file_size: 0,
+          device_label: 'PC',
+          created_at: new Date(now - 1000 * 60 * 5).toISOString()
+        },
+        {
+          id: 'demo-2',
+          type: 'image',
+          title: 'sample_screenshot.svg',
+          content: 'sample_screenshot.svg',
+          storage_path: 'demo/sample_screenshot.svg',
+          preview_url: DEMO_SAMPLE_IMG,
+          mime_type: 'image/svg+xml',
+          file_size: 14200,
+          device_label: 'Phone',
+          created_at: new Date(now - 1000 * 60 * 30).toISOString()
+        }
+      ];
+    }
+
+    const state = {
+      mode: 'demo',
+      authTab: 'signin',
+      composerTab: 'link',
+      filter: 'all',
+      search: '',
+      sort: 'newest',
+      user: null,
+      supabaseClient: null,
+      drops: [],
+      pendingDeleteId: null,
+      previewItemId: null,
+      selectedImageFile: null,
+      selectedVideoFile: null
+    };
+
+    function refreshIcons() {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    }
+
+    function detectDeviceLabel() {
+      return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '') ? 'Phone' : 'PC';
+    }
+
+    function formatBytes(bytes) {
+      const num = Number(bytes) || 0;
+      if (num === 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.min(Math.floor(Math.log(num) / Math.log(1024)), units.length - 1);
+      const val = num / Math.pow(1024, i);
+      return `${val >= 100 || i === 0 ? val.toFixed(0) : val.toFixed(1)} ${units[i]}`;
+    }
+
+    function formatRelativeTime(isoString) {
+      const diffSec = Math.max(0, Math.floor((Date.now() - new Date(isoString).getTime()) / 1000));
+      if (diffSec < 60) return 'Just now';
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+      return new Date(isoString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+
+    function isValidUrl(str) {
+      if (!str) return false;
+      try {
+        const u = new URL(str.trim());
+        return u.protocol === 'http:' || u.protocol === 'https:';
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function showToast(message, variant = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const styles = {
+        success: 'bg-surface-900 border-brand-400/50 text-emerald-200',
+        error: 'bg-surface-900 border-rose-500/50 text-rose-200',
+        info: 'bg-surface-900 border-surface-700 text-slate-200'
+      };
+      toast.className = `pointer-events-auto border rounded-xl px-3.5 py-2.5 text-xs font-medium shadow-xl transition-all duration-200 ${styles[variant] || styles.info}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 200);
+      }, 2800);
+    }
+
+    async function copyText(text, successMsg = 'Copied') {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          showToast(successMsg, 'success');
+          return;
+        }
+      } catch (_) {}
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast(successMsg, 'success');
+      } catch (_) {
+        showToast('Copy failed — please copy manually.', 'error');
+      }
+    }
+
+    function loadSavedConfig() {
+      if (DEFAULT_SUPABASE_CONFIG.url && DEFAULT_SUPABASE_CONFIG.anonKey) {
+        return { ...DEFAULT_SUPABASE_CONFIG };
+      }
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_CONFIG);
+        if (raw) return JSON.parse(raw);
+      } catch (_) {}
+      return { url: '', anonKey: '' };
+    }
+
+    function saveConfig(url, anonKey) {
+      try {
+        localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify({ url, anonKey }));
+      } catch (_) {}
+    }
+
+    function initSupabaseClient(url, anonKey) {
+      if (!url || !anonKey) {
+        state.supabaseClient = null;
+        return null;
+      }
+      if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+        showToast('Supabase SDK unavailable. Use Demo Login or check internet.', 'error');
+        return null;
+      }
+      try {
+        state.supabaseClient = window.supabase.createClient(url.trim(), anonKey.trim());
+        return state.supabaseClient;
+      } catch (err) {
+        showToast(`Invalid Supabase config: ${err.message}`, 'error');
+        state.supabaseClient = null;
+        return null;
+      }
+    }
+
+    function updateConfigBadge() {
+      const url = document.getElementById('input-sb-url').value.trim();
+      const key = document.getElementById('input-sb-key').value.trim();
+      const badge = document.getElementById('config-status-badge');
+      badge.textContent = url && key ? 'Keys Set' : 'Keys';
+    }
+
+    function showAuthView() {
+      document.getElementById('auth-view').classList.remove('hidden');
+      document.getElementById('app-view').classList.add('hidden');
+      refreshIcons();
+    }
+
+    function showAppView() {
+      document.getElementById('auth-view').classList.add('hidden');
+      document.getElementById('app-view').classList.remove('hidden');
+      document.getElementById('header-user-email').textContent = state.user ? state.user.email : '';
+
+      const modeBadge = document.getElementById('mode-badge');
+      if (state.mode === 'live') {
+        modeBadge.textContent = 'Live';
+        modeBadge.className = 'text-[10px] font-medium px-2 py-0.5 rounded-full bg-brand-400/15 text-brand-400 border border-brand-400/30';
+      } else {
+        modeBadge.textContent = 'Demo';
+        modeBadge.className = 'text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
+      }
+      renderDrops();
+      refreshIcons();
+    }
+
+    function launchDemoMode() {
+      state.mode = 'demo';
+      state.user = { id: 'demo-user', email: 'demo@local' };
+      if (state.drops.length === 0) state.drops = createInitialDemoDrops();
+      showAppView();
+    }
+
+    async function handleAuthSubmit(e) {
+      e.preventDefault();
+      const errBox = document.getElementById('auth-error-box');
+      errBox.classList.add('hidden');
+
+      const url = document.getElementById('input-sb-url').value.trim();
+      const key = document.getElementById('input-sb-key').value.trim();
+      if (!url || !key) {
+        document.getElementById('config-panel').classList.remove('hidden');
+        errBox.textContent = 'Add your Supabase URL & Anon Key under Keys first, or use Demo Login.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      saveConfig(url, key);
+      updateConfigBadge();
+      const client = initSupabaseClient(url, key);
+      if (!client) return;
+
+      const email = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-password').value;
+      const btn = document.getElementById('btn-auth-submit');
+      btn.disabled = true;
+
+      try {
+        if (state.authTab === 'signup') {
+          const { data, error } = await client.auth.signUp({ email, password });
+          if (error) throw error;
+          if (data.session && data.user) {
+            state.mode = 'live';
+            state.user = data.user;
+            await fetchLiveDrops();
+            showAppView();
+          } else {
+            showToast('Account created. Check email to confirm, then sign in.', 'success');
+          }
+        } else {
+          const { data, error } = await client.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+          state.mode = 'live';
+          state.user = data.user;
+          await fetchLiveDrops();
+          showAppView();
+        }
+      } catch (err) {
+        errBox.textContent = err.message || 'Authentication failed.';
+        errBox.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function handleSignOut() {
+      if (state.mode === 'live' && state.supabaseClient) {
+        try { await state.supabaseClient.auth.signOut(); } catch (_) {}
+      }
+      state.user = null;
+      state.drops = [];
+      showAuthView();
+    }
+
+    async function fetchLiveDrops() {
+      if (state.mode !== 'live' || !state.supabaseClient) return;
+      try {
+        const { data, error } = await state.supabaseClient
+          .from('drops')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+
+        const items = data || [];
+        for (const item of items) {
+          if (item.storage_path) {
+            const { data: signedData } = await state.supabaseClient.storage
+              .from('vault')
+              .createSignedUrl(item.storage_path, 3600);
+            item.preview_url = signedData ? signedData.signedUrl : null;
+          }
+        }
+        state.drops = items;
+        renderDrops();
+      } catch (err) {
+        showToast(`Sync error: ${err.message}`, 'error');
+      }
+    }
+
+    async function handleSaveLink(e) {
+      e.preventDefault();
+      const contentInput = document.getElementById('drop-link-content');
+      const titleInput = document.getElementById('drop-link-title');
+      const content = contentInput.value.trim();
+      if (!content) return;
+
+      let title = titleInput.value.trim();
+      if (!title) {
+        if (isValidUrl(content)) {
+          try { title = new URL(content).hostname.replace(/^www\./, ''); } catch (_) { title = 'Link'; }
+        } else {
+          title = content.length > 40 ? content.slice(0, 40) + '…' : content;
+        }
+      }
+
+      const device = detectDeviceLabel();
+      if (state.mode === 'demo') {
+        state.drops.unshift({
+          id: 'demo-' + Date.now(),
+          type: 'link',
+          title,
+          content,
+          storage_path: null,
+          preview_url: null,
+          mime_type: isValidUrl(content) ? 'text/uri-list' : 'text/plain',
+          file_size: 0,
+          device_label: device,
+          created_at: new Date().toISOString()
+        });
+        contentInput.value = '';
+        titleInput.value = '';
+        renderDrops();
+        showToast('Saved', 'success');
+        return;
+      }
+
+      const btn = document.getElementById('btn-save-link');
+      btn.disabled = true;
+      try {
+        const { error } = await state.supabaseClient.from('drops').insert({
+          user_id: state.user.id,
+          type: 'link',
+          title,
+          content,
+          mime_type: isValidUrl(content) ? 'text/uri-list' : 'text/plain',
+          file_size: 0,
+          device_label: device
+        });
+        if (error) throw error;
+        contentInput.value = '';
+        titleInput.value = '';
+        await fetchLiveDrops();
+        showToast('Saved', 'success');
+      } catch (err) {
+        showToast(`Save failed: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function handleMediaUpload(type, file, titleInputEl, labelEl, btnEl) {
+      if (!file) {
+        showToast(`Select a ${type} file first.`, 'error');
+        return;
+      }
+      if (file.size > FREE_TIER_MAX_FILE_BYTES) {
+        showToast(`File exceeds 50 MB Free Tier limit (${formatBytes(file.size)}).`, 'error');
+        return;
+      }
+      const currentBytes = state.drops.reduce((acc, d) => acc + (Number(d.file_size) || 0), 0);
+      if (currentBytes + file.size > FREE_TIER_STORAGE_LIMIT_BYTES) {
+        showToast('Exceeds 1 GB storage quota. Delete old files first.', 'error');
+        return;
+      }
+
+      const title = titleInputEl.value.trim() || file.name;
+      const device = detectDeviceLabel();
+
+      if (state.mode === 'demo') {
+        const objectUrl = URL.createObjectURL(file);
+        state.drops.unshift({
+          id: 'demo-' + Date.now(),
+          type,
+          title,
+          content: file.name,
+          storage_path: `demo/${file.name}`,
+          preview_url: objectUrl,
+          mime_type: file.type || (type === 'image' ? 'image/png' : 'video/mp4'),
+          file_size: file.size,
+          device_label: device,
+          created_at: new Date().toISOString()
+        });
+        titleInputEl.value = '';
+        if (type === 'image') {
+          state.selectedImageFile = null;
+          document.getElementById('input-image-file').value = '';
+          labelEl.textContent = 'Click or drop an image (max 50 MB)';
+        } else {
+          state.selectedVideoFile = null;
+          document.getElementById('input-video-file').value = '';
+          labelEl.textContent = 'Click or drop a video (max 50 MB)';
+        }
+        renderDrops();
+        showToast('Uploaded', 'success');
+        return;
+      }
+
+      btnEl.disabled = true;
+      try {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `${state.user.id}/${Date.now()}_${safeName}`;
+        const { error: uploadErr } = await state.supabaseClient.storage
+          .from('vault')
+          .upload(path, file, { upsert: false });
+        if (uploadErr) throw uploadErr;
+
+        const { error: dbErr } = await state.supabaseClient.from('drops').insert({
+          user_id: state.user.id,
+          type,
+          title,
+          content: file.name,
+          storage_path: path,
+          mime_type: file.type || null,
+          file_size: file.size,
+          device_label: device
+        });
+        if (dbErr) throw dbErr;
+
+        titleInputEl.value = '';
+        if (type === 'image') {
+          state.selectedImageFile = null;
+          document.getElementById('input-image-file').value = '';
+          labelEl.textContent = 'Click or drop an image (max 50 MB)';
+        } else {
+          state.selectedVideoFile = null;
+          document.getElementById('input-video-file').value = '';
+          labelEl.textContent = 'Click or drop a video (max 50 MB)';
+        }
+        await fetchLiveDrops();
+        showToast('Uploaded', 'success');
+      } catch (err) {
+        showToast(`Upload failed: ${err.message}`, 'error');
+      } finally {
+        btnEl.disabled = false;
+      }
+    }
+
+    function openDeleteModal(id) {
+      const item = state.drops.find(d => d.id === id);
+      if (!item) return;
+      state.pendingDeleteId = id;
+      document.getElementById('delete-modal-type').textContent = item.type.toUpperCase();
+      document.getElementById('delete-modal-title').textContent = item.title;
+      document.getElementById('delete-modal-meta').textContent = item.file_size
+        ? `${formatBytes(item.file_size)} • ${item.device_label}`
+        : `${item.device_label} • ${formatRelativeTime(item.created_at)}`;
+
+      document.getElementById('delete-confirm-checkbox').checked = false;
+      document.getElementById('btn-confirm-delete').disabled = true;
+      document.getElementById('delete-modal').classList.remove('hidden');
+    }
+
+    function closeDeleteModal() {
+      state.pendingDeleteId = null;
+      document.getElementById('delete-modal').classList.add('hidden');
+    }
+
+    async function executeConfirmedDelete() {
+      const id = state.pendingDeleteId;
+      const item = state.drops.find(d => d.id === id);
+      if (!item) { closeDeleteModal(); return; }
+
+      if (state.mode === 'demo') {
+        state.drops = state.drops.filter(d => d.id !== id);
+        closeDeleteModal();
+        renderDrops();
+        showToast('Deleted', 'info');
+        return;
+      }
+
+      const btn = document.getElementById('btn-confirm-delete');
+      btn.disabled = true;
+      try {
+        if (item.storage_path) {
+          const { error: storageErr } = await state.supabaseClient.storage
+            .from('vault')
+            .remove([item.storage_path]);
+          if (storageErr) throw storageErr;
+        }
+        const { error: dbErr } = await state.supabaseClient
+          .from('drops')
+          .delete()
+          .eq('id', id);
+        if (dbErr) throw dbErr;
+
+        closeDeleteModal();
+        await fetchLiveDrops();
+        showToast('Deleted', 'info');
+      } catch (err) {
+        showToast(`Delete failed: ${err.message}`, 'error');
+        btn.disabled = false;
+      }
+    }
+
+    function downloadDrop(item) {
+      if (item.type === 'link') {
+        const blob = new Blob([`${item.title}\n${item.content}\n`], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${item.title.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40) || 'link'}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast('Downloaded', 'success');
+        return;
+      }
+
+      if (!item.preview_url) {
+        showToast('No file URL available.', 'error');
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = item.preview_url;
+      a.download = item.content || item.title || 'download';
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast('Downloading...', 'success');
+    }
+
+    function openPreviewModal(item) {
+      state.previewItemId = item.id;
+      document.getElementById('preview-modal-title').textContent = item.title;
+      document.getElementById('preview-modal-meta').textContent = `${item.type.toUpperCase()} • ${formatBytes(item.file_size)}`;
+      const body = document.getElementById('preview-modal-body');
+      body.innerHTML = '';
+
+      if (item.type === 'image' && item.preview_url) {
+        const img = document.createElement('img');
+        img.src = item.preview_url;
+        img.alt = item.title;
+        img.className = 'max-w-full max-h-[68vh] rounded-lg object-contain';
+        body.appendChild(img);
+      } else if (item.type === 'video' && item.preview_url) {
+        const video = document.createElement('video');
+        video.src = item.preview_url;
+        video.controls = true;
+        video.className = 'max-w-full max-h-[68vh] rounded-lg';
+        body.appendChild(video);
+      }
+      document.getElementById('preview-modal').classList.remove('hidden');
+      refreshIcons();
+    }
+
+    function renderDrops() {
+      const totalBytes = state.drops.reduce((acc, d) => acc + (Number(d.file_size) || 0), 0);
+      const pct = Math.min(100, (totalBytes / FREE_TIER_STORAGE_LIMIT_BYTES) * 100);
+      document.getElementById('quota-text').textContent = `${formatBytes(totalBytes)} / 1 GB`;
+      document.getElementById('quota-bar').style.width = `${Math.max(pct, totalBytes > 0 ? 2 : 0.5)}%`;
+
+      document.getElementById('count-all').textContent = state.drops.length;
+      document.getElementById('count-link').textContent = state.drops.filter(d => d.type === 'link').length;
+      document.getElementById('count-image').textContent = state.drops.filter(d => d.type === 'image').length;
+      document.getElementById('count-video').textContent = state.drops.filter(d => d.type === 'video').length;
+
+      let filtered = state.drops.filter(item => {
+        if (state.filter !== 'all' && item.type !== state.filter) return false;
+        if (state.search) {
+          const q = state.search.toLowerCase();
+          if (!`${item.title} ${item.content || ''}`.toLowerCase().includes(q)) return false;
+        }
+        return true;
+      });
+
+      filtered.sort((a, b) => {
+        if (state.sort === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+        if (state.sort === 'largest') return (Number(b.file_size) || 0) - (Number(a.file_size) || 0);
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+
+      const grid = document.getElementById('drops-grid');
+      const empty = document.getElementById('empty-state');
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        refreshIcons();
+        return;
+      }
+
+      empty.classList.add('hidden');
+      grid.innerHTML = filtered.map(item => {
+        const isUrl = item.type === 'link' && isValidUrl(item.content);
+        const typeColors = {
+          link: 'bg-sky-500/15 text-sky-300',
+          image: 'bg-brand-400/15 text-brand-400',
+          video: 'bg-violet-500/15 text-violet-300'
+        };
+
+        let mediaBlock = '';
+        if (item.type === 'image' && item.preview_url) {
+          mediaBlock = `
+            <button type="button" data-action="preview" data-id="${escapeHtml(item.id)}" class="block w-full h-36 rounded-xl overflow-hidden bg-surface-950 border border-surface-800 mb-3 cursor-pointer">
+              <img src="${escapeHtml(item.preview_url)}" alt="${escapeHtml(item.title)}" class="w-full h-full object-cover" />
+            </button>
+          `;
+        } else if (item.type === 'video' && item.preview_url) {
+          mediaBlock = `
+            <div class="w-full h-36 rounded-xl overflow-hidden bg-surface-950 border border-surface-800 mb-3">
+              <video src="${escapeHtml(item.preview_url)}" controls class="w-full h-full object-contain"></video>
+            </div>
+          `;
+        } else if (item.type === 'link') {
+          mediaBlock = `
+            <div class="rounded-xl bg-surface-950 border border-surface-800 p-2.5 mb-3 min-h-[56px] flex items-center">
+              ${isUrl
+                ? `<a href="${escapeHtml(item.content)}" target="_blank" rel="noopener noreferrer" class="text-xs text-sky-400 hover:underline break-all line-clamp-2">${escapeHtml(item.content)}</a>`
+                : `<p class="text-xs text-slate-300 break-words line-clamp-2">${escapeHtml(item.content)}</p>`
+              }
+            </div>
+          `;
+        }
+
+        return `
+          <article class="bg-surface-900 border border-surface-800 rounded-2xl p-3.5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase ${typeColors[item.type]}">${item.type}</span>
+                <span class="text-[11px] text-slate-500">${escapeHtml(item.device_label || 'Web')} • ${formatRelativeTime(item.created_at)}</span>
+              </div>
+              <h3 class="text-sm font-semibold text-white truncate mb-2" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</h3>
+              ${mediaBlock}
+            </div>
+
+            <div class="pt-2.5 border-t border-surface-800/80 flex items-center justify-between gap-2">
+              <span class="text-[11px] font-mono text-slate-500">${item.file_size ? formatBytes(item.file_size) : ''}</span>
+              <div class="flex items-center gap-1.5">
+                <button type="button" data-action="copy" data-id="${escapeHtml(item.id)}" title="Copy"
+                  class="px-2.5 py-1 rounded-lg bg-surface-800 hover:bg-surface-700 text-slate-200 text-xs font-medium cursor-pointer">
+                  Copy
+                </button>
+                <button type="button" data-action="download" data-id="${escapeHtml(item.id)}" title="Download"
+                  class="p-1.5 rounded-lg bg-surface-800 hover:bg-brand-400/20 hover:text-brand-400 text-slate-300 cursor-pointer">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" data-action="delete" data-id="${escapeHtml(item.id)}" title="Delete"
+                  class="p-1.5 rounded-lg bg-surface-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 cursor-pointer">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      refreshIcons();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('sql-code-block').textContent = SUPABASE_SETUP_SQL;
+
+      const saved = loadSavedConfig();
+      if (saved.url) document.getElementById('input-sb-url').value = saved.url;
+      if (saved.anonKey) document.getElementById('input-sb-key').value = saved.anonKey;
+      updateConfigBadge();
+
+      document.getElementById('btn-toggle-config').addEventListener('click', () => {
+        document.getElementById('config-panel').classList.toggle('hidden');
+      });
+
+      document.getElementById('btn-save-config').addEventListener('click', () => {
+        const url = document.getElementById('input-sb-url').value.trim();
+        const key = document.getElementById('input-sb-key').value.trim();
+        saveConfig(url, key);
+        updateConfigBadge();
+        document.getElementById('config-panel').classList.add('hidden');
+        showToast(url && key ? 'Keys saved' : 'Keys cleared', 'success');
+      });
+
+      const tabSignin = document.getElementById('tab-signin');
+      const tabSignup = document.getElementById('tab-signup');
+      const submitLabel = document.getElementById('auth-submit-label');
+
+      tabSignin.addEventListener('click', () => {
+        state.authTab = 'signin';
+        tabSignin.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md bg-surface-800 text-white transition cursor-pointer';
+        tabSignup.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white transition cursor-pointer';
+        submitLabel.textContent = 'Sign In';
+      });
+
+      tabSignup.addEventListener('click', () => {
+        state.authTab = 'signup';
+        tabSignup.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md bg-surface-800 text-white transition cursor-pointer';
+        tabSignin.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white transition cursor-pointer';
+        submitLabel.textContent = 'Sign Up';
+      });
+
+      document.getElementById('auth-form').addEventListener('submit', handleAuthSubmit);
+      document.getElementById('btn-launch-demo').addEventListener('click', launchDemoMode);
+      document.getElementById('btn-signout').addEventListener('click', handleSignOut);
+
+      document.getElementById('btn-sync').addEventListener('click', async () => {
+        if (state.mode === 'live') {
+          await fetchLiveDrops();
+          showToast('Synced', 'success');
+        } else {
+          renderDrops();
+          showToast('Up to date', 'info');
+        }
+      });
+
+      document.querySelectorAll('.composer-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tab = btn.dataset.composerTab;
+          state.composerTab = tab;
+          document.querySelectorAll('.composer-tab').forEach(b => {
+            const active = b.dataset.composerTab === tab;
+            b.className = active
+              ? 'composer-tab px-3 py-1.5 rounded-md text-xs font-semibold bg-surface-800 text-white transition flex items-center gap-1.5 cursor-pointer'
+              : 'composer-tab px-3 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer';
+          });
+          document.getElementById('form-link-drop').classList.toggle('hidden', tab !== 'link');
+          document.getElementById('form-image-drop').classList.toggle('hidden', tab !== 'image');
+          document.getElementById('form-video-drop').classList.toggle('hidden', tab !== 'video');
+        });
+      });
+
+      document.getElementById('btn-paste-clipboard').addEventListener('click', async () => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            const txt = await navigator.clipboard.readText();
+            if (txt) {
+              document.getElementById('drop-link-content').value = txt;
+              return;
+            }
+          }
+          showToast('Press Ctrl+V / Cmd+V to paste.', 'info');
+        } catch (_) {
+          showToast('Press Ctrl+V / Cmd+V to paste.', 'info');
+        }
+      });
+
+      document.getElementById('form-link-drop').addEventListener('submit', handleSaveLink);
+
+      function setupDropzone(zoneId, inputId, labelId, type) {
+        const zone = document.getElementById(zoneId);
+        const input = document.getElementById(inputId);
+        const label = document.getElementById(labelId);
+
+        const assignFile = (file) => {
+          if (!file) return;
+          if (type === 'image') state.selectedImageFile = file;
+          else state.selectedVideoFile = file;
+          label.textContent = `${file.name} (${formatBytes(file.size)})`;
+        };
+
+        zone.addEventListener('click', () => input.click());
+        input.addEventListener('change', () => assignFile(input.files[0]));
+        zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dropzone-active'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dropzone-active'));
+        zone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          zone.classList.remove('dropzone-active');
+          if (e.dataTransfer.files && e.dataTransfer.files[0]) assignFile(e.dataTransfer.files[0]);
+        });
+      }
+
+      setupDropzone('image-dropzone', 'input-image-file', 'image-file-label', 'image');
+      setupDropzone('video-dropzone', 'input-video-file', 'video-file-label', 'video');
+
+      document.getElementById('form-image-drop').addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleMediaUpload(
+          'image',
+          state.selectedImageFile,
+          document.getElementById('drop-image-title'),
+          document.getElementById('image-file-label'),
+          document.getElementById('btn-upload-image')
+        );
+      });
+
+      document.getElementById('form-video-drop').addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleMediaUpload(
+          'video',
+          state.selectedVideoFile,
+          document.getElementById('drop-video-title'),
+          document.getElementById('video-file-label'),
+          document.getElementById('btn-upload-video')
+        );
+      });
+
+      document.querySelectorAll('.filter-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.filter = btn.dataset.filter;
+          document.querySelectorAll('.filter-pill').forEach(b => {
+            const active = b.dataset.filter === state.filter;
+            b.className = active
+              ? 'filter-pill px-3 py-1 rounded-full text-xs font-semibold bg-brand-400 text-surface-950 transition cursor-pointer'
+              : 'filter-pill px-3 py-1 rounded-full text-xs font-semibold bg-surface-900 text-slate-300 border border-surface-800 hover:border-surface-700 transition cursor-pointer';
+          });
+          renderDrops();
+        });
+      });
+
+      document.getElementById('search-input').addEventListener('input', (e) => {
+        state.search = e.target.value.trim();
+        renderDrops();
+      });
+
+      document.getElementById('sort-select').addEventListener('change', (e) => {
+        state.sort = e.target.value;
+        renderDrops();
+      });
+
+      document.getElementById('drops-grid').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const item = state.drops.find(d => d.id === btn.dataset.id);
+        if (!item) return;
+
+        if (btn.dataset.action === 'copy') {
+          copyText(item.type === 'link' ? item.content : (item.preview_url || item.title), 'Copied');
+        } else if (btn.dataset.action === 'download') {
+          downloadDrop(item);
+        } else if (btn.dataset.action === 'preview') {
+          openPreviewModal(item);
+        } else if (btn.dataset.action === 'delete') {
+          openDeleteModal(item.id);
+        }
+      });
+
+      document.getElementById('delete-confirm-checkbox').addEventListener('change', (e) => {
+        document.getElementById('btn-confirm-delete').disabled = !e.target.checked;
+      });
+      document.getElementById('btn-cancel-delete').addEventListener('click', closeDeleteModal);
+      document.getElementById('btn-confirm-delete').addEventListener('click', executeConfirmedDelete);
+
+      document.getElementById('btn-close-preview').addEventListener('click', () => {
+        document.getElementById('preview-modal').classList.add('hidden');
+        document.getElementById('preview-modal-body').innerHTML = '';
+      });
+      document.getElementById('btn-preview-download').addEventListener('click', () => {
+        const item = state.drops.find(d => d.id === state.previewItemId);
+        if (item) downloadDrop(item);
+      });
+
+      const openSetup = () => {
+        document.getElementById('setup-modal').classList.remove('hidden');
+        refreshIcons();
+      };
+      document.getElementById('open-setup-from-auth').addEventListener('click', openSetup);
+      document.getElementById('btn-open-setup-bottom').addEventListener('click', openSetup);
+      document.getElementById('btn-open-setup').addEventListener('click', openSetup);
+      document.getElementById('btn-close-setup').addEventListener('click', () => {
+        document.getElementById('setup-modal').classList.add('hidden');
+      });
+      document.getElementById('btn-copy-sql').addEventListener('click', () => {
+        copyText(SUPABASE_SETUP_SQL, 'SQL copied');
+      });
+
+      ['delete-modal', 'preview-modal', 'setup-modal'].forEach(modalId => {
+        const el = document.getElementById(modalId);
+        el.addEventListener('click', (e) => {
+          if (e.target === el) {
+            el.classList.add('hidden');
+            if (modalId === 'preview-modal') document.getElementById('preview-modal-body').innerHTML = '';
+          }
+        });
+      });
+
+      refreshIcons();
+    });
+  </script>
+</body>
+</html>
